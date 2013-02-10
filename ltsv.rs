@@ -172,7 +172,7 @@ impl<T: io::Reader> LTSVParser<T> {
             match self.cur {
                 0x01..0x08 | 0x0b | 0x0c |
                 0x0e..0xff => bytes.push(self.cur as u8),
-                0x0d => return self.check_trailing_LF(str::from_bytes(bytes)),
+                0x0d => return self.consume_foward_LF(str::from_bytes(bytes)),
                 0x0a => return ParseOk(FieldValue(NL), str::from_bytes(bytes)),
                 0x09 => return ParseOk(FieldValue(TAB), str::from_bytes(bytes)),
                 -1   => return ParseOk(FieldValue(EOF), str::from_bytes(bytes)),
@@ -182,7 +182,7 @@ impl<T: io::Reader> LTSVParser<T> {
         }
     }
 
-    fn check_trailing_LF(&mut self, rv: ~str) -> ParseResult<~str> {
+    fn consume_forward_LF(&mut self, rv: ~str) -> ParseResult<~str> {
         self.bump();
         if self.cur != 0x0a {
             ParseError(~"CR detected, but not provided with LF")
