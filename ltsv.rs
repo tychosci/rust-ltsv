@@ -98,6 +98,7 @@ pub impl<T: io::Reader> LTSVReader for T {
                 ParseOk(_, field)  => if !f(&field) { break; },
                 ParseError(reason) => die!(reason)
             }
+            parser.bump();
         }
     }
 }
