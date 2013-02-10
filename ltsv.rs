@@ -54,7 +54,6 @@ pub trait LTSVWriter {
 
 pub trait LTSVReader {
     fn read_ltsv(&self) -> ~[Record];
-    fn read_ltsv_record(&self) -> Record;
 }
 
 pub impl<T: io::Writer> LTSVWriter for T {
@@ -79,13 +78,6 @@ pub impl<T: io::Reader> LTSVReader for T {
         let mut parser = LTSVParser::new(self);
         match parser.parse_records() {
             ParseOk(_, records) => records,
-            ParseError(reason) => die!(reason)
-        }
-    }
-    fn read_ltsv_record(&self) -> Record {
-        let mut parser = LTSVParser::new(self);
-        match parser.parse_fields() {
-            ParseOk(_, record) => record,
             ParseError(reason) => die!(reason)
         }
     }
