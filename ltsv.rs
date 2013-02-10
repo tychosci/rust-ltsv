@@ -19,7 +19,7 @@ fn main() {
 ~~~~~~~~~~~~~~~~~~~~~~
 */
 #[link(name = "ltsv",
-       vers = "0.1",
+       vers = "0.2",
        uuid = "E0EA0251-E165-4612-919F-38E89ACECBE9",
        url  = "https://github.com/tychosci/rust-ltsv/")];
 
