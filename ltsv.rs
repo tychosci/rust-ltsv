@@ -76,94 +76,126 @@ pub impl<T: io::Writer> LTSVWriter for T {
 
 pub impl<T: io::Reader> LTSVReader for T {
     fn read_ltsv(&self) -> ~[Record] {
-        match parse_records(self) {
+        let mut parser = LTSVParser::new(self);
+        parser.skip_whitespaces();
+        match parser.parse_records() {
             ParseOk(_, records) => records,
             ParseError(reason) => die!(reason)
         }
     }
     fn read_ltsv_record(&self) -> Record {
-        match parse_fields(self) {
+        let mut parser = LTSVParser::new(self);
+        parser.skip_whitespaces();
+        match parser.parse_fields() {
             ParseOk(_, record) => record,
             ParseError(reason) => die!(reason)
         }
     }
 }
 
-fn parse_records<T: io::Reader>(rd: &T) -> ParseResult<~[Record]> {
-    let mut records = ~[];
-    loop {
-        match parse_fields(rd) {
-            ParseOk(_, record) => {
-                records.push(record);
-                if rd.eof() { break; }
+struct LTSVParser<T> {
+    priv rd: &T,
+    priv cur: int
+}
+
+impl<T: io::Reader> LTSVParser<T> {
+    static fn new(rd: &r/T) -> LTSVParser/&r<T> {
+        let cur = rd.read_byte();
+        LTSVParser { rd: rd, cur: cur }
+    }
+
+    fn bump(&mut self) {
+        if self.cur != -1 {
+            self.cur = self.rd.read_byte();
+        }
+    }
+
+    fn parse_records(&mut self) -> ParseResult<~[Record]> {
+        let mut records = ~[];
+        loop {
+            match self.parse_fields() {
+                ParseOk(_, record) => {
+                    records.push(record);
+                    if self.cur == -1 { break; }
+                }
+                ParseError(reason) => {
+                    return ParseError(reason);
+                }
             }
-            ParseError(reason) => {
-                return ParseError(reason);
+        }
+        ParseOk(Record, records)
+    }
+
+    fn parse_fields(&mut self) -> ParseResult<Record> {
+        let mut record = LinearMap::new();
+        loop {
+            let label = match self.parse_field_label() {
+                ParseOk(_, label)  => { self.bump(); label },
+                ParseError(reason) => return ParseError(reason)
+            };
+            match self.parse_field_value() {
+                ParseOk(FieldValue(TAB), value) => {
+                    self.bump();
+                    record.insert(label, value);
+                }
+                ParseOk(_, value) => {
+                    self.bump();
+                    record.insert(label, value);
+                    return ParseOk(Field, record);
+                }
+                ParseError(reason) => {
+                    return ParseError(reason);
+                }
             }
         }
     }
-    ParseOk(Record, records)
-}
 
-fn parse_fields<T: io::Reader>(rd: &T) -> ParseResult<Record> {
-    let mut record = LinearMap::new();
-    loop {
-        let label = match parse_field_label(rd) {
-            ParseOk(_, label)  => label,
-            ParseError(reason) => return ParseError(reason)
-        };
-        match parse_field_value(rd) {
-            ParseOk(FieldValue(TAB), value) => {
-                record.insert(label, value);
+    fn parse_field_label(&mut self) -> ParseResult<~str> {
+        let mut bytes = ~[];
+        loop {
+            io::println("a");
+            match self.cur {
+                0x30..0x39 | 0x41..0x5a | 0x61..0x7a | 0x5f |
+                0x2e | 0x2d => bytes.push(self.cur as u8),
+                0x3a if bytes.len() == 0 => return ParseError(~"label is empty"),
+                0x3a => return ParseOk(FieldLabel, str::from_bytes(bytes)),
+                -1   => return ParseError(~"EOF while parsing field label"),
+                _    => return ParseError(~"invalid byte detected")
             }
-            ParseOk(_, value) => {
-                record.insert(label, value);
-                return ParseOk(Field, record);
-            }
-            ParseError(reason) => {
-                return ParseError(reason);
-            }
+            self.bump();
         }
     }
-}
 
-fn parse_field_label<T: io::Reader>(rd: &T) -> ParseResult<~str> {
-    let mut bytes = ~[];
-    loop {
-        let b = rd.read_byte();
-        match b {
-            0x30..0x39 | 0x41..0x5a | 0x61..0x7a | 0x5f |
-            0x2e | 0x2d => bytes.push(b as u8),
-            0x3a if bytes.len() == 0 => return ParseError(~"label is empty"),
-            0x3a => return ParseOk(FieldLabel, str::from_bytes(bytes)),
-            -1   => return ParseError(~"EOF while parsing field label"),
-            _    => return ParseError(~"invalid byte detected")
+    fn parse_field_value(&mut self) -> ParseResult<~str> {
+        let mut bytes = ~[];
+        loop {
+            io::println("b");
+            match self.cur {
+                0x01..0x08 | 0x0b | 0x0c |
+                0x0e..0xff => bytes.push(self.cur as u8),
+                0x0d => return self.check_trailing_LF(str::from_bytes(bytes)),
+                0x0a => return ParseOk(FieldValue(NL), str::from_bytes(bytes)),
+                0x09 => return ParseOk(FieldValue(TAB), str::from_bytes(bytes)),
+                -1   => return ParseOk(FieldValue(EOF), str::from_bytes(bytes)),
+                _    => return ParseError(~"invalid byte detected")
+            }
+            self.bump();
         }
     }
-}
 
-fn parse_field_value<T: io::Reader>(rd: &T) -> ParseResult<~str> {
-    let mut bytes = ~[];
-    loop {
-        let b = rd.read_byte();
-        match b {
-            0x01..0x08 | 0x0b | 0x0c |
-            0x0e..0xff => bytes.push(b as u8),
-            0x0d => return try_read_trailing_LF(rd, str::from_bytes(bytes)),
-            0x0a => return ParseOk(FieldValue(NL), str::from_bytes(bytes)),
-            0x09 => return ParseOk(FieldValue(TAB), str::from_bytes(bytes)),
-            -1   => return ParseOk(FieldValue(EOF), str::from_bytes(bytes)),
-            _    => return ParseError(~"invalid byte detected")
+    fn check_trailing_LF(&mut self, rv: ~str) -> ParseResult<~str> {
+        self.bump();
+        if self.cur != 0x0a {
+            ParseError(~"CR detected, but not provided with LF")
+        } else {
+            ParseOk(FieldValue(NL), rv)
         }
     }
-}
 
-#[inline(always)]
-fn try_read_trailing_LF<T: io::Reader>(rd: &T, rv: ~str) -> ParseResult<~str> {
-    if rd.read_byte() != 0x0a {
-        ParseError(~"CR detected, but not provided with LF")
-    } else {
-        ParseOk(FieldValue(NL), rv)
+    fn skip_whitespaces(&mut self) {
+        while !char::is_whitespace(self.cur as char) {
+            self.bump();
+        }
     }
 }
 
