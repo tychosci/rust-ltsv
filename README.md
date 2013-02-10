@@ -1,7 +1,7 @@
 rust-ltsv
 =========
 
-Library for Reading/Writing [LTSV](http://ltsv.org/) data from Rust.
+Library for reading/writing [LTSV](http://ltsv.org/) data from Rust.
 
 Example
 -------
