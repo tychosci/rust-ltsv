@@ -15,7 +15,7 @@ reading file with LTSV format:
         let infile = io::file_reader(&Path("path/fo/file.tlsv")).get();
         for infile.read_ltsv().each |record| {
             for record.each |&(label, value)| {
-                io::println(fmt!("label: %s, value: %s", *label, *value));
+                io::println(fmt!("%s: %s", *label, *value));
             }
         }
     }
