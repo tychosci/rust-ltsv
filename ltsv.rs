@@ -77,7 +77,6 @@ pub impl<T: io::Writer> LTSVWriter for T {
 pub impl<T: io::Reader> LTSVReader for T {
     fn read_ltsv(&self) -> ~[Record] {
         let mut parser = LTSVParser::new(self);
-        parser.skip_whitespaces();
         match parser.parse_records() {
             ParseOk(_, records) => records,
             ParseError(reason) => die!(reason)
@@ -85,7 +84,6 @@ pub impl<T: io::Reader> LTSVReader for T {
     }
     fn read_ltsv_record(&self) -> Record {
         let mut parser = LTSVParser::new(self);
-        parser.skip_whitespaces();
         match parser.parse_fields() {
             ParseOk(_, record) => record,
             ParseError(reason) => die!(reason)
@@ -128,6 +126,7 @@ impl<T: io::Reader> LTSVParser<T> {
 
     fn parse_fields(&mut self) -> ParseResult<Record> {
         let mut record = LinearMap::new();
+        self.skip_whitespaces();
         loop {
             let label = match self.parse_field_label() {
                 ParseOk(_, label)  => { self.bump(); label },
@@ -136,10 +135,12 @@ impl<T: io::Reader> LTSVParser<T> {
             match self.parse_field_value() {
                 ParseOk(FieldValue(TAB), value) => {
                     self.bump();
+                    self.skip_whitespaces();
                     record.insert(label, value);
                 }
                 ParseOk(_, value) => {
                     self.bump();
+                    self.skip_whitespaces();
                     record.insert(label, value);
                     return ParseOk(Field, record);
                 }
@@ -153,7 +154,6 @@ impl<T: io::Reader> LTSVParser<T> {
     fn parse_field_label(&mut self) -> ParseResult<~str> {
         let mut bytes = ~[];
         loop {
-            io::println("a");
             match self.cur {
                 0x30..0x39 | 0x41..0x5a | 0x61..0x7a | 0x5f |
                 0x2e | 0x2d => bytes.push(self.cur as u8),
@@ -169,7 +169,6 @@ impl<T: io::Reader> LTSVParser<T> {
     fn parse_field_value(&mut self) -> ParseResult<~str> {
         let mut bytes = ~[];
         loop {
-            io::println("b");
             match self.cur {
                 0x01..0x08 | 0x0b | 0x0c |
                 0x0e..0xff => bytes.push(self.cur as u8),
@@ -193,7 +192,7 @@ impl<T: io::Reader> LTSVParser<T> {
     }
 
     fn skip_whitespaces(&mut self) {
-        while !char::is_whitespace(self.cur as char) {
+        while char::is_whitespace(self.cur as char) {
             self.bump();
         }
     }
