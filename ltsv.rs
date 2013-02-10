@@ -84,7 +84,7 @@ pub impl<T: io::Reader> LTSVReader for T {
     }
     fn each_ltsv_record(&self, f: &fn(&Record) -> bool) {
         let mut parser = LTSVParser::new(self);
-        while !parser.eof() {
+        while !parser.eof() { // FIXME: This emits odd loaning errors.
             match parser.parse_record() {
                 ParseOk(_, record) => if !f(&record) { break; },
                 ParseError(reason) => die!(reason)
@@ -93,7 +93,7 @@ pub impl<T: io::Reader> LTSVReader for T {
     }
     fn each_ltsv_field(&self, f: &fn(&(~str, ~str)) -> bool) {
         let mut parser = LTSVParser::new(self);
-        while !parser.eof() {
+        while !parser.eof() { // FIXME: This emits odd loaning errors.
             match parser.parse_field() {
                 ParseOk(_, field)  => if !f(&field) { break; },
                 ParseError(reason) => die!(reason)
