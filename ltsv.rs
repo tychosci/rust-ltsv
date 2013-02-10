@@ -41,9 +41,13 @@ enum ParseType {
     Ltsv
 }
 
+enum ParseDelimiter {
+    EOF, TAB, NL, MISC
+}
+
 enum ParseResult<T> {
     ParseError(~str),
-    ParseOk(ParseType, T)
+    ParseOk(ParseType, ParseDelimiter, T)
 }
 
 pub trait LTSVWriter {
@@ -78,16 +82,16 @@ pub impl<T: io::Reader> LTSVReader for T {
     fn read_ltsv(&self) -> ~[Record] {
         let mut parser = LTSVParser::new(self);
         match parser.parse_ltsv() {
-            ParseOk(_, records) => records,
-            ParseError(reason) => die!(reason)
+            ParseError(reason) => die!(reason),
+            ParseOk(_, _, records) => records
         }
     }
     fn each_ltsv_record(&self, f: &fn(&Record) -> bool) {
         let mut parser = LTSVParser::new(self);
         while !parser.eof() { // FIXME: This emits odd loaning errors.
             match parser.parse_record() {
-                ParseOk(_, record) => if !f(&record) { break; },
-                ParseError(reason) => die!(reason)
+                ParseError(reason) => die!(reason),
+                ParseOk(_, _, record) => if !f(&record) { break; }
             }
         }
     }
@@ -95,10 +99,9 @@ pub impl<T: io::Reader> LTSVReader for T {
         let mut parser = LTSVParser::new(self);
         while !parser.eof() { // FIXME: This emits odd loaning errors.
             match parser.parse_field() {
-                ParseOk(_, field)  => if !f(&field) { break; },
-                ParseError(reason) => die!(reason)
+                ParseError(reason) => die!(reason),
+                ParseOk(_, _, field) => if !f(&field) { break; }
             }
-            parser.bump();
         }
     }
 }
@@ -126,16 +129,19 @@ impl<T: io::Reader> LTSVParser<T> {
         let mut records = ~[];
         loop {
             match self.parse_record() {
-                ParseOk(_, record) => {
-                    records.push(record);
-                    if self.eof() { break; }
-                }
                 ParseError(reason) => {
                     return ParseError(reason);
                 }
+                ParseOk(_, EOF, record) => {
+                    records.push(record);
+                    break;
+                }
+                ParseOk(_, _, record) => {
+                    records.push(record);
+                }
             }
         }
-        ParseOk(Ltsv, records)
+        ParseOk(Ltsv, EOF, records)
     }
 
     fn parse_record(&mut self) -> ParseResult<Record> {
@@ -143,17 +149,15 @@ impl<T: io::Reader> LTSVParser<T> {
         self.skip_whitespaces();
         loop {
             match self.parse_field() {
-                ParseOk(_, (label, value)) => {
-                    let saved_cur = self.cur;
-                    self.bump();
-                    record.insert(label, value);
-                    if saved_cur == 0xa || saved_cur == -1 {
-                        self.skip_whitespaces();
-                        return ParseOk(Record, record);
-                    }
-                }
                 ParseError(reason) => {
                     return ParseError(reason);
+                }
+                ParseOk(_, TAB, (label, value)) => {
+                    record.insert(label, value);
+                }
+                ParseOk(_, delim, (label, value)) => {
+                    record.insert(label, value);
+                    return ParseOk(Record, delim, record);
                 }
             }
         }
@@ -161,15 +165,16 @@ impl<T: io::Reader> LTSVParser<T> {
 
     fn parse_field(&mut self) -> ParseResult<(~str, ~str)> {
         let label = match self.parse_field_label() {
-            ParseOk(_, label)  => { self.bump(); label },
-            ParseError(reason) => return ParseError(reason)
+            ParseError(reason) => return ParseError(reason),
+            ParseOk(_, _, label) => { self.bump(); label }
         };
         match self.parse_field_value() {
-            ParseOk(_, value) => {
-                ParseOk(Field, (label, value))
-            }
             ParseError(reason) => {
                 ParseError(reason)
+            }
+            ParseOk(_, delim, value) => {
+                self.bump();
+                ParseOk(Field, delim, (label, value))
             }
         }
     }
@@ -181,7 +186,7 @@ impl<T: io::Reader> LTSVParser<T> {
                 0x30..0x39 | 0x41..0x5a | 0x61..0x7a | 0x5f |
                 0x2e | 0x2d => bytes.push(self.cur as u8),
                 0x3a if bytes.len() == 0 => return ParseError(~"label is empty"),
-                0x3a => return ParseOk(FieldLabel, str::from_bytes(bytes)),
+                0x3a => return ParseOk(FieldLabel, MISC, str::from_bytes(bytes)),
                 -1   => return ParseError(~"EOF while parsing field label"),
                 _    => return ParseError(~"invalid byte detected")
             }
@@ -196,9 +201,9 @@ impl<T: io::Reader> LTSVParser<T> {
                 0x01..0x08 | 0x0b | 0x0c |
                 0x0e..0xff => bytes.push(self.cur as u8),
                 0x0d => return self.consume_forward_LF(str::from_bytes(bytes)),
-                0x0a => return ParseOk(FieldValue, str::from_bytes(bytes)),
-                0x09 => return ParseOk(FieldValue, str::from_bytes(bytes)),
-                -1   => return ParseOk(FieldValue, str::from_bytes(bytes)),
+                0x0a => return ParseOk(FieldValue, NL, str::from_bytes(bytes)),
+                0x09 => return ParseOk(FieldValue, TAB, str::from_bytes(bytes)),
+                -1   => return ParseOk(FieldValue, EOF, str::from_bytes(bytes)),
                 _    => return ParseError(~"invalid byte detected")
             }
             self.bump();
@@ -210,7 +215,7 @@ impl<T: io::Reader> LTSVParser<T> {
         if self.cur != 0x0a {
             ParseError(~"CR detected, but not provided with LF")
         } else {
-            ParseOk(FieldValue, rv)
+            ParseOk(FieldValue, NL, rv)
         }
     }
 
