@@ -77,24 +77,24 @@ pub impl<T: io::Writer> LTSVWriter for T {
 pub impl<T: io::Reader> LTSVReader for T {
     fn read_ltsv(&self) -> ~[Record] {
         match parse_records(self) {
-            ParseOk(_, maps) => maps,
+            ParseOk(_, records) => records,
             ParseError(reason) => die!(reason)
         }
     }
     fn read_ltsv_record(&self) -> Record {
         match parse_fields(self) {
-            ParseOk(_, map) => map,
+            ParseOk(_, record) => record,
             ParseError(reason) => die!(reason)
         }
     }
 }
 
 fn parse_records<T: io::Reader>(rd: &T) -> ParseResult<~[Record]> {
-    let mut maps = ~[];
+    let mut records = ~[];
     loop {
         match parse_fields(rd) {
-            ParseOk(_, map) => {
-                maps.push(map);
+            ParseOk(_, record) => {
+                records.push(record);
                 if rd.eof() { break; }
             }
             ParseError(reason) => {
@@ -102,11 +102,11 @@ fn parse_records<T: io::Reader>(rd: &T) -> ParseResult<~[Record]> {
             }
         }
     }
-    ParseOk(Record, maps)
+    ParseOk(Record, records)
 }
 
 fn parse_fields<T: io::Reader>(rd: &T) -> ParseResult<Record> {
-    let mut linear_map = LinearMap::new();
+    let mut record = LinearMap::new();
     loop {
         let label = match parse_field_label(rd) {
             ParseOk(_, label)  => label,
@@ -114,11 +114,11 @@ fn parse_fields<T: io::Reader>(rd: &T) -> ParseResult<Record> {
         };
         match parse_field_value(rd) {
             ParseOk(FieldValue(TAB), value) => {
-                linear_map.insert(label, value);
+                record.insert(label, value);
             }
             ParseOk(_, value) => {
-                linear_map.insert(label, value);
-                return ParseOk(Field, linear_map);
+                record.insert(label, value);
+                return ParseOk(Field, record);
             }
             ParseError(reason) => {
                 return ParseError(reason);
@@ -174,8 +174,8 @@ mod tests {
 
     #[test]
     fn test_parse_simple() {
-        let ms = io::with_str_reader(~"a:1\tb:2", |rd| rd.read_ltsv());
-        assert ms.len() == 1;
+        let records = io::with_str_reader(~"a:1\tb:2", |rd| rd.read_ltsv());
+        assert records.len() == 1;
     }
 
     #[test]
@@ -190,8 +190,8 @@ mod tests {
             wr.write_str(fmt!("%s:%s\t", "kamaboko", "普通"));
             wr.write_str(fmt!("%s:%s\n", "sukonbu", "苦手"));
         });
-        let ms = io::with_str_reader(s, |rd| rd.read_ltsv());
-        assert ms.len() == 2;
+        let records = io::with_str_reader(s, |rd| rd.read_ltsv());
+        assert records.len() == 2;
     }
 
     #[test]
@@ -201,9 +201,9 @@ mod tests {
             wr.write_str(fmt!("%s:%s\t", "inu", "yes"));
             wr.write_str(fmt!("%s:%s\n", "tori", "yes"));
         });
-        let ltsv = io::with_str_reader(s, |rd| rd.read_ltsv());
-        let s2 = io::with_str_writer(|wr| wr.write_ltsv(ltsv));
-        let ltsv2 = io::with_str_reader(s2, |rd| rd.read_ltsv());
-        assert ltsv == ltsv2;
+        let records_1 = io::with_str_reader(s, |rd| rd.read_ltsv());
+        let s2 = io::with_str_writer(|wr| wr.write_ltsv(records_1));
+        let records_2 = io::with_str_reader(s2, |rd| rd.read_ltsv());
+        assert records_1 == records_2;
     }
 }
