@@ -172,7 +172,7 @@ impl<T: io::Reader> LTSVParser<T> {
             match self.cur {
                 0x01..0x08 | 0x0b | 0x0c |
                 0x0e..0xff => bytes.push(self.cur as u8),
-                0x0d => return self.consume_foward_LF(str::from_bytes(bytes)),
+                0x0d => return self.consume_forward_LF(str::from_bytes(bytes)),
                 0x0a => return ParseOk(FieldValue(NL), str::from_bytes(bytes)),
                 0x09 => return ParseOk(FieldValue(TAB), str::from_bytes(bytes)),
                 -1   => return ParseOk(FieldValue(EOF), str::from_bytes(bytes)),
