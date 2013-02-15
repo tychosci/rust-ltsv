@@ -236,15 +236,8 @@ mod tests {
     use super::*;
     use core::io::WriterUtil;
 
-    #[test]
-    fn test_parse_simple() {
-        let records = io::with_str_reader(~"a:1\tb:2", |rd| rd.read_ltsv());
-        assert records.len() == 1;
-    }
-
-    #[test]
-    fn test_parse_full() {
-        let s = io::with_str_writer(|wr| {
+    fn mk_record_string() -> ~str {
+        do io::with_str_writer |wr| {
             // genzairyou
             wr.write_str(fmt!("%s:%s\t", "tofu", "豆"));
             wr.write_str(fmt!("%s:%s\t", "kamaboko", "魚"));
@@ -253,21 +246,43 @@ mod tests {
             wr.write_str(fmt!("%s:%s\t", "tofu", "好き"));
             wr.write_str(fmt!("%s:%s\t", "kamaboko", "普通"));
             wr.write_str(fmt!("%s:%s\n", "sukonbu", "苦手"));
-        });
+        }
+    }
+
+    #[test]
+    fn test_parse_simple() {
+        let records = io::with_str_reader(~"a:1\tb:2", |rd| rd.read_ltsv());
+        assert records.len() == 1;
+    }
+
+    #[test]
+    fn test_parse_full() {
+        let s = mk_record_string();
         let records = io::with_str_reader(s, |rd| rd.read_ltsv());
         assert records.len() == 2;
     }
 
     #[test]
     fn test_parse_ltsv_trailing_nl_and_write() {
-        let s = io::with_str_writer(|wr| {
-            wr.write_str(fmt!("%s:%s\t", "neko", "yes"));
-            wr.write_str(fmt!("%s:%s\t", "inu", "yes"));
-            wr.write_str(fmt!("%s:%s\n", "tori", "yes"));
-        });
+        let s = mk_record_string();
         let records_1 = io::with_str_reader(s, |rd| rd.read_ltsv());
         let s2 = io::with_str_writer(|wr| wr.write_ltsv(records_1));
         let records_2 = io::with_str_reader(s2, |rd| rd.read_ltsv());
         assert records_1 == records_2;
+    }
+
+    #[test]
+    fn test_each_read_each_record() {
+        let s = mk_record_string();
+        let ks = [~"tofu", ~"kamaboko", ~"sukonbu"];
+        let vs = [~"豆", ~"魚", ~"海藻", ~"好き", ~"普通", ~"苦手"];
+        do io::with_str_reader(s) |rd| {
+            for rd.each_ltsv_record |record| {
+                for record.each |&(k, v)| {
+                    assert ks.contains(k);
+                    assert vs.contains(v);
+                }
+            }
+        }
     }
 }
