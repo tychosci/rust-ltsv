@@ -108,7 +108,7 @@ pub impl<T: io::Reader> LTSVReader for T {
 
 struct LTSVParser<T> {
     priv rd: &T,
-    priv cur: int
+    priv mut cur: int
 }
 
 impl<T: io::Reader> LTSVParser<T> {
@@ -119,13 +119,13 @@ impl<T: io::Reader> LTSVParser<T> {
 
     fn eof(&self) -> bool { self.cur == -1 }
 
-    fn bump(&mut self) {
+    fn bump(&self) {
         if !self.eof() {
             self.cur = self.rd.read_byte();
         }
     }
 
-    fn parse_ltsv(&mut self) -> ParseResult<~[Record]> {
+    fn parse_ltsv(&self) -> ParseResult<~[Record]> {
         let mut records = ~[];
         loop {
             match self.parse_record() {
@@ -144,9 +144,8 @@ impl<T: io::Reader> LTSVParser<T> {
         ParseOk(Ltsv, EOF, records)
     }
 
-    fn parse_record(&mut self) -> ParseResult<Record> {
+    fn parse_record(&self) -> ParseResult<Record> {
         let mut record = LinearMap::new();
-        self.skip_whitespaces();
         loop {
             match self.parse_field() {
                 ParseError(reason) => {
@@ -163,7 +162,8 @@ impl<T: io::Reader> LTSVParser<T> {
         }
     }
 
-    fn parse_field(&mut self) -> ParseResult<(~str, ~str)> {
+    fn parse_field(&self) -> ParseResult<(~str, ~str)> {
+        self.skip_whitespaces();
         let label = match self.parse_field_label() {
             ParseError(reason) => return ParseError(reason),
             ParseOk(_, _, label) => { self.bump(); label }
@@ -174,12 +174,15 @@ impl<T: io::Reader> LTSVParser<T> {
             }
             ParseOk(_, delim, value) => {
                 self.bump();
+                self.skip_whitespaces();
+                // re-check EOF
+                let delim = if self.eof() { EOF } else { delim };
                 ParseOk(Field, delim, (label, value))
             }
         }
     }
 
-    fn parse_field_label(&mut self) -> ParseResult<~str> {
+    priv fn parse_field_label(&self) -> ParseResult<~str> {
         let mut bytes = ~[];
         loop {
             match self.cur {
@@ -194,7 +197,7 @@ impl<T: io::Reader> LTSVParser<T> {
         }
     }
 
-    fn parse_field_value(&mut self) -> ParseResult<~str> {
+    priv fn parse_field_value(&self) -> ParseResult<~str> {
         let mut bytes = ~[];
         loop {
             match self.cur {
@@ -210,7 +213,7 @@ impl<T: io::Reader> LTSVParser<T> {
         }
     }
 
-    fn consume_forward_LF(&mut self, rv: ~str) -> ParseResult<~str> {
+    priv fn consume_forward_LF(&self, rv: ~str) -> ParseResult<~str> {
         self.bump();
         if self.cur != 0x0a {
             ParseError(~"CR detected, but not provided with LF")
@@ -219,7 +222,7 @@ impl<T: io::Reader> LTSVParser<T> {
         }
     }
 
-    fn skip_whitespaces(&mut self) {
+    priv fn skip_whitespaces(&self) {
         while char::is_whitespace(self.cur as char) {
             self.bump();
         }
