@@ -41,6 +41,7 @@ enum ParseType {
     Ltsv
 }
 
+#[deriving_eq]
 enum ParseDelimiter {
     EOF, TAB, NL, MISC
 }
@@ -174,7 +175,8 @@ impl<T: io::Reader> LTSVParser<T> {
             }
             ParseOk(_, delim, value) => {
                 self.bump();
-                self.skip_whitespaces();
+                // avoid skipping whitespaces in the middle of parsing record.
+                if delim != TAB { self.skip_whitespaces(); }
                 // re-check EOF
                 let delim = if self.eof() { EOF } else { delim };
                 ParseOk(Field, delim, (label, value))
