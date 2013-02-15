@@ -35,7 +35,7 @@ writing LTSV data:
         record.insert(~"user", ~"$remote_user");
         record.insert(~"status", ~"$status");
         records.push(record);
-        
+
         let ltsv_str = do io::with_str_writer |wr| {
             wr.write_ltsv(records);
         };
