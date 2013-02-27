@@ -62,7 +62,7 @@ pub trait LTSVReader {
     fn each_ltsv_field(&self, f: &fn(&(~str, ~str)) -> bool);
 }
 
-pub impl<T: io::Writer> LTSVWriter for T {
+impl<T: io::Writer> LTSVWriter for T {
     fn write_ltsv(&self, ltsv: &[Record]) {
         for ltsv.each |record| {
             self.write_ltsv_record(record);
@@ -79,7 +79,7 @@ pub impl<T: io::Writer> LTSVWriter for T {
     }
 }
 
-pub impl<T: io::Reader> LTSVReader for T {
+impl<T: io::Reader> LTSVReader for T {
     fn read_ltsv(&self) -> ~[Record] {
         let mut parser = LTSVParser::new(self);
         match parser.parse_ltsv() {
