@@ -112,7 +112,7 @@ struct LTSVParser<T> {
     priv mut cur: int
 }
 
-impl<T: io::Reader> LTSVParser<T> {
+pub impl<T: io::Reader> LTSVParser<T> {
     static fn new(rd: &r/T) -> LTSVParser/&r<T> {
         let cur = rd.read_byte();
         LTSVParser { rd: rd, cur: cur }
