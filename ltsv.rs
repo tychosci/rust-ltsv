@@ -29,7 +29,7 @@ fn main() {
 
 use core::container::Map;
 use core::hashmap::linear::LinearMap;
-use io::WriterUtil;
+use core::io::WriterUtil;
 
 pub type Record = LinearMap<~str, ~str>;
 
