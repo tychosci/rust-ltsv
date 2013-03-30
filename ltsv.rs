@@ -252,14 +252,14 @@ mod tests {
     #[test]
     fn test_parse_simple() {
         let records = io::with_str_reader(~"a:1\tb:2", |rd| rd.read_ltsv());
-        fail_unless!(records.len() == 1);
+        assert_eq!(records.len(), 1);
     }
 
     #[test]
     fn test_parse_full() {
         let s = mk_record_string();
         let records = io::with_str_reader(s, |rd| rd.read_ltsv());
-        fail_unless!(records.len() == 2);
+        assert_eq!(records.len(), 2);
     }
 
     #[test]
@@ -268,7 +268,7 @@ mod tests {
         let records_1 = io::with_str_reader(s, |rd| rd.read_ltsv());
         let s2 = io::with_str_writer(|wr| wr.write_ltsv(records_1));
         let records_2 = io::with_str_reader(s2, |rd| rd.read_ltsv());
-        fail_unless!(records_1 == records_2);
+        assert_eq!(records_1, records_2);
     }
 
     #[test]
@@ -279,8 +279,8 @@ mod tests {
         do io::with_str_reader(s) |rd| {
             for rd.each_ltsv_record |record| {
                 for record.each |&(k, v)| {
-                    fail_unless!(ks.contains(k));
-                    fail_unless!(vs.contains(v));
+                    assert!(ks.contains(k));
+                    assert!(vs.contains(v));
                 }
             }
         }
