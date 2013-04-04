@@ -41,7 +41,7 @@ enum ParseType {
     Ltsv
 }
 
-#[deriving_eq]
+#[deriving(Eq)]
 enum ParseDelimiter {
     EOF, TAB, NL, MISC
 }
@@ -107,13 +107,13 @@ impl<T: io::Reader> LTSVReader for T {
     }
 }
 
-struct LTSVParser<T> {
+struct LTSVParser<'self, T> {
     priv rd: &'self T,
     priv cur: @mut int
 }
 
-pub impl<T: io::Reader> LTSVParser<'self, T> {
-    fn new(rd: &'r T) -> LTSVParser/&r<T> {
+pub impl<'self, T: io::Reader> LTSVParser<'self, T> {
+    fn new(rd: &'self T) -> LTSVParser<'self, T> {
         let cur = @mut rd.read_byte();
         LTSVParser { rd: rd, cur: cur }
     }
