@@ -118,12 +118,8 @@ pub impl<'self, T: io::Reader> LTSVParser<'self, T> {
         LTSVParser { rd: rd, cur: cur }
     }
 
-    fn eof(&self) -> bool { *self.cur == -1 }
-
-    fn bump(&self) {
-        if !self.eof() {
-            *self.cur = self.rd.read_byte();
-        }
+    fn eof(&self) -> bool {
+        *self.cur == -1
     }
 
     fn parse_ltsv(&self) -> ParseResult<~[Record]> {
@@ -221,6 +217,12 @@ pub impl<'self, T: io::Reader> LTSVParser<'self, T> {
             ParseError(~"CR detected, but not provided with LF")
         } else {
             ParseOk(FieldValue, NL, rv)
+        }
+    }
+
+    priv fn bump(&self) {
+        if !self.eof() {
+            *self.cur = self.rd.read_byte();
         }
     }
 
